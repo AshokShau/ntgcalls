@@ -31,6 +31,10 @@ namespace ntgcalls {
         int64_t frameSize() override;
 
         uint8_t frameRate() override;
+
+        void resetTime() override {
+            frames = 0;
+        };
     };
 
 } // ntgcalls

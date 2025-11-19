@@ -275,6 +275,9 @@ namespace ntgcalls {
             readers[device]->onData(nullptr);
             readers[device]->onEof(nullptr);
         }
+        if (streams.contains({Capture, device})) {
+            streams[{Capture, device}]->resetTime();
+        }
         readers.erase(device);
         externalReaders.erase(device);
         if (cancelSyncReaders.contains(device)) {

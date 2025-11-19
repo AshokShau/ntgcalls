@@ -20,6 +20,8 @@ namespace ntgcalls {
 
         std::chrono::nanoseconds nanoTime();
 
+        virtual void resetTime() = 0;
+
         virtual int64_t frameSize() = 0;
 
         virtual uint8_t frameRate() = 0;
