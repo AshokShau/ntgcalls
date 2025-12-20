@@ -5,13 +5,12 @@ import (
 	"gotgcalls/ubot/types"
 	"sync"
 
-	"github.com/Laky-64/gologging"
 	tg "github.com/amarnathcjd/gogram/telegram"
 )
 
 type Context struct {
 	binding               *ntgcalls.Client
-	app                   *tg.Client
+	App                   *tg.Client
 	mutedByAdmin          []int64
 	presentations         []int64
 	pendingPresentation   map[int64]bool
@@ -29,10 +28,10 @@ type Context struct {
 	frameCallbacks        []ntgcalls.FrameCallback
 }
 
-func NewInstance(app *tg.Client) *Context {
+func NewInstance(app *tg.Client) (*Context, error) {
 	client := &Context{
 		binding:             ntgcalls.NTgCalls(),
-		app:                 app,
+		App:                 app,
 		pendingPresentation: make(map[int64]bool),
 		p2pConfigs:          make(map[int64]*types.P2PConfig),
 		inputCalls:          make(map[int64]*tg.InputPhoneCall),
@@ -45,12 +44,12 @@ func NewInstance(app *tg.Client) *Context {
 	if app.IsConnected() {
 		self, err := app.GetMe()
 		if err != nil {
-			gologging.Fatal(err)
+			return nil, err
 		}
 		client.self = self
 	}
 	client.handleUpdates()
-	return client
+	return client, nil
 }
 
 func (ctx *Context) OnIncomingCall(callback func(client *Context, chatId int64)) {

@@ -19,15 +19,12 @@ import (
 	"gotgcalls/ntgcalls"
 	"gotgcalls/ubot"
 
-	"github.com/Laky-64/gologging"
 	tg "github.com/amarnathcjd/gogram/telegram"
 )
 
 var urlVideoTest = "https://docs.evostream.com/sample_content/assets/sintel1m720p.mp4"
 
 func main() {
-	gologging.SetLevel(gologging.FatalLevel)
-	gologging.GetLogger("ntgcalls").SetLevel(gologging.DebugLevel)
 	mtProto, _ := tg.NewClient(tg.ClientConfig{
 		AppID:   10029733,
 		AppHash: "d0d81009d46e774f78c0e0e622f5fa21",
@@ -35,21 +32,27 @@ func main() {
 	})
 	_ = mtProto.Start()
 
-	uBotInstance := ubot.NewInstance(mtProto)
-	defer uBotInstance.Close()
+	uBotInstance, err := ubot.NewInstance(mtProto)
+	if err != nil {
+		panic(err)
+	}
 
+	defer uBotInstance.Close()
 	uBotInstance.OnIncomingCall(func(client *ubot.Context, chatId int64) {
 		err := uBotInstance.Play(chatId, getMediaDescription(urlVideoTest))
 		if err != nil {
-			gologging.Fatal(err)
+			panic(err)
 		}
 	})
+
 	uBotInstance.OnStreamEnd(func(chatId int64, streamType ntgcalls.StreamType, streamDevice ntgcalls.StreamDevice) {
 		fmt.Println("Stream ended with chatId:", chatId, "streamType:", streamType, "streamDevice:", streamDevice)
 	})
+
 	uBotInstance.OnFrame(func(chatId int64, mode ntgcalls.StreamMode, device ntgcalls.StreamDevice, frames []ntgcalls.Frame) {
 		fmt.Println("Received frames for chatId:", chatId, "mode:", mode, "device:", device)
 	})
+
 	mtProto.On("message:[!/.]play", func(message *tg.NewMessage) error {
 		err := uBotInstance.Play(message.ChannelID(), getMediaDescription(urlVideoTest))
 		if err != nil {

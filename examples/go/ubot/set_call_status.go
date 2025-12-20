@@ -7,7 +7,7 @@ import (
 )
 
 func (ctx *Context) setCallStatus(call tg.InputGroupCall, state ntgcalls.MediaState) error {
-	_, err := ctx.app.PhoneEditGroupCallParticipant(
+	_, err := ctx.App.PhoneEditGroupCallParticipant(
 		&tg.PhoneEditGroupCallParticipantParams{
 			Call: call,
 			Participant: &tg.InputPeerUser{

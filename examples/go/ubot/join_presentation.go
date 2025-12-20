@@ -30,7 +30,7 @@ func (ctx *Context) joinPresentation(chatId int64, join bool) error {
 					return err
 				}
 				resultParams := "{\"transport\": null}"
-				callResRaw, err := ctx.app.PhoneJoinGroupCallPresentation(
+				callResRaw, err := ctx.App.PhoneJoinGroupCallPresentation(
 					ctx.inputGroupCalls[chatId],
 					&tg.DataJson{
 						Data: jsonParams,
@@ -63,7 +63,7 @@ func (ctx *Context) joinPresentation(chatId int64, join bool) error {
 			if err != nil {
 				return err
 			}
-			_, err = ctx.app.PhoneLeaveGroupCallPresentation(
+			_, err = ctx.App.PhoneLeaveGroupCallPresentation(
 				ctx.inputGroupCalls[chatId],
 			)
 			if err != nil {
