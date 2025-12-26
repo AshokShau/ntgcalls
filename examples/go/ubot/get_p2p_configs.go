@@ -7,10 +7,11 @@ import (
 )
 
 func (ctx *Context) getP2PConfigs(GAorB []byte) (*types.P2PConfig, error) {
-	dhConfigRaw, err := ctx.app.MessagesGetDhConfig(0, 256)
+	dhConfigRaw, err := ctx.App.MessagesGetDhConfig(0, 256)
 	if err != nil {
 		return nil, err
 	}
+	
 	dhConfig := dhConfigRaw.(*tg.MessagesDhConfigObj)
 	return &types.P2PConfig{
 		DhConfig:   dhConfig,

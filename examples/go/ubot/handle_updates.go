@@ -11,7 +11,7 @@ import (
 )
 
 func (ctx *Context) handleUpdates() {
-	ctx.app.AddRawHandler(&tg.UpdatePhoneCallSignalingData{}, func(m tg.Update, c *tg.Client) error {
+	ctx.App.AddRawHandler(&tg.UpdatePhoneCallSignalingData{}, func(m tg.Update, c *tg.Client) error {
 		signalingData := m.(*tg.UpdatePhoneCallSignalingData)
 		userId, err := ctx.convertCallId(signalingData.PhoneCallID)
 		if err == nil {
@@ -20,7 +20,7 @@ func (ctx *Context) handleUpdates() {
 		return nil
 	})
 
-	ctx.app.AddRawHandler(&tg.UpdatePhoneCall{}, func(m tg.Update, _ *tg.Client) error {
+	ctx.App.AddRawHandler(&tg.UpdatePhoneCall{}, func(m tg.Update, _ *tg.Client) error {
 		phoneCall := m.(*tg.UpdatePhoneCall).PhoneCall
 
 		var ID int64
@@ -76,7 +76,7 @@ func (ctx *Context) handleUpdates() {
 				reasonMessage = fmt.Sprintf("call declined by %d", userId)
 			}
 			if ctx.p2pConfigs[userId] != nil {
-				ctx.p2pConfigs[userId].WaitData <- fmt.Errorf(reasonMessage)
+				ctx.p2pConfigs[userId].WaitData <- fmt.Errorf("%s", reasonMessage)
 			}
 			delete(ctx.inputCalls, userId)
 			_ = ctx.binding.Stop(userId)
@@ -95,7 +95,7 @@ func (ctx *Context) handleUpdates() {
 		return nil
 	})
 
-	ctx.app.AddRawHandler(&tg.UpdateGroupCallParticipants{}, func(m tg.Update, c *tg.Client) error {
+	ctx.App.AddRawHandler(&tg.UpdateGroupCallParticipants{}, func(m tg.Update, c *tg.Client) error {
 		participantsUpdate := m.(*tg.UpdateGroupCallParticipants)
 		chatId, err := ctx.convertGroupCallId(participantsUpdate.Call.(*tg.InputGroupCallObj).ID)
 		if err == nil {
@@ -160,8 +160,8 @@ func (ctx *Context) handleUpdates() {
 			ctx.participantsMutex.Unlock()
 
 			for _, participant := range participantsUpdate.Participants {
-				userPeer := participant.Peer.(*tg.PeerUser)
-				if userPeer.UserID == ctx.self.ID {
+				participantId := getParticipantId(participant.Peer)
+				if participantId == ctx.self.ID {
 					connectionMode, err := ctx.binding.GetConnectionMode(chatId)
 					if err == nil && connectionMode == ntgcalls.StreamConnection && participant.CanSelfUnmute {
 						if ctx.pendingConnections[chatId] != nil {
@@ -192,23 +192,31 @@ func (ctx *Context) handleUpdates() {
 		return nil
 	})
 
-	ctx.app.AddRawHandler(&tg.UpdateGroupCall{}, func(m tg.Update, c *tg.Client) error {
+	ctx.App.AddRawHandler(&tg.UpdateGroupCall{}, func(m tg.Update, c *tg.Client) error {
 		updateGroupCall := m.(*tg.UpdateGroupCall)
+		if updateGroupCall.Peer == nil {
+			return nil
+		}
+
 		if groupCallRaw := updateGroupCall.Call; groupCallRaw != nil {
-			chatID, err := ctx.parseChatId(updateGroupCall.ChatID)
+			chatID, err := ctx.parseChatId(updateGroupCall.Peer)
 			if err != nil {
 				return err
 			}
 			switch groupCallRaw.(type) {
 			case *tg.GroupCallObj:
 				groupCall := groupCallRaw.(*tg.GroupCallObj)
+				ctx.inputGroupCallsMutex.Lock()
 				ctx.inputGroupCalls[chatID] = &tg.InputGroupCallObj{
 					ID:         groupCall.ID,
 					AccessHash: groupCall.AccessHash,
 				}
+				ctx.inputGroupCallsMutex.Unlock()
 				return nil
 			case *tg.GroupCallDiscarded:
+				ctx.inputGroupCallsMutex.Lock()
 				delete(ctx.inputGroupCalls, chatID)
+				ctx.inputGroupCallsMutex.Unlock()
 				_ = ctx.binding.Stop(chatID)
 				return nil
 			}
@@ -217,8 +225,11 @@ func (ctx *Context) handleUpdates() {
 	})
 
 	ctx.binding.OnRequestBroadcastTimestamp(func(chatId int64) {
-		if ctx.inputGroupCalls[chatId] != nil {
-			channels, err := ctx.app.PhoneGetGroupCallStreamChannels(ctx.inputGroupCalls[chatId])
+		ctx.inputGroupCallsMutex.RLock()
+		inputGroupCall := ctx.inputGroupCalls[chatId]
+		ctx.inputGroupCallsMutex.RUnlock()
+		if inputGroupCall != nil {
+			channels, err := ctx.App.PhoneGetGroupCallStreamChannels(inputGroupCall)
 			if err == nil {
 				_ = ctx.binding.SendBroadcastTimestamp(chatId, channels.Channels[0].LastTimestampMs)
 			}
@@ -226,11 +237,14 @@ func (ctx *Context) handleUpdates() {
 	})
 
 	ctx.binding.OnRequestBroadcastPart(func(chatId int64, segmentPartRequest ntgcalls.SegmentPartRequest) {
-		if ctx.inputGroupCalls[chatId] != nil {
-			file, err := ctx.app.UploadGetFile(
+		ctx.inputGroupCallsMutex.RLock()
+		inputGroupCall := ctx.inputGroupCalls[chatId]
+		ctx.inputGroupCallsMutex.RUnlock()
+		if inputGroupCall != nil {
+			file, err := ctx.App.UploadGetFile(
 				&tg.UploadGetFileParams{
 					Location: &tg.InputGroupCallStream{
-						Call:         ctx.inputGroupCalls[chatId],
+						Call:         inputGroupCall,
 						TimeMs:       segmentPartRequest.Timestamp,
 						Scale:        0,
 						VideoChannel: segmentPartRequest.ChannelID,
@@ -267,7 +281,7 @@ func (ctx *Context) handleUpdates() {
 	})
 
 	ctx.binding.OnSignal(func(chatId int64, signal []byte) {
-		_, _ = ctx.app.PhoneSendSignalingData(ctx.inputCalls[chatId], signal)
+		_, _ = ctx.App.PhoneSendSignalingData(ctx.inputCalls[chatId], signal)
 	})
 
 	ctx.binding.OnConnectionChange(func(chatId int64, state ntgcalls.NetworkInfo) {
@@ -285,7 +299,10 @@ func (ctx *Context) handleUpdates() {
 	})
 
 	ctx.binding.OnUpgrade(func(chatId int64, state ntgcalls.MediaState) {
-		err := ctx.setCallStatus(ctx.inputGroupCalls[chatId], state)
+		ctx.inputGroupCallsMutex.RLock()
+		inputGroupCall := ctx.inputGroupCalls[chatId]
+		ctx.inputGroupCallsMutex.RUnlock()
+		err := ctx.setCallStatus(inputGroupCall, state)
 		if err != nil {
 			fmt.Println(err)
 		}

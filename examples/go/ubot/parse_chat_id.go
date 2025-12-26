@@ -7,8 +7,21 @@ import (
 )
 
 func (ctx *Context) parseChatId(chatId any) (int64, error) {
+	if chatId == nil {
+		return 0, fmt.Errorf("chatId cannot be nil")
+	}
+
 	var parsedChatId int64
 	switch v := chatId.(type) {
+	case tg.Peer:
+		switch v.(type) {
+		case *tg.PeerUser:
+			parsedChatId = v.(*tg.PeerUser).UserID
+		case *tg.PeerChat:
+			parsedChatId = -v.(*tg.PeerChat).ChatID
+		case *tg.PeerChannel:
+			parsedChatId = -1000000000000 - v.(*tg.PeerChannel).ChannelID
+		}
 	case int64:
 		parsedChatId = v
 	case int:
@@ -20,7 +33,7 @@ func (ctx *Context) parseChatId(chatId any) (int64, error) {
 	case int8:
 		parsedChatId = int64(v)
 	case string:
-		rawChat, err := ctx.app.ResolveUsername(chatId.(string))
+		rawChat, err := ctx.App.ResolveUsername(chatId.(string))
 		if err != nil {
 			return 0, fmt.Errorf("failed to resolve username: %w", err)
 		}
@@ -38,7 +51,7 @@ func (ctx *Context) parseChatId(chatId any) (int64, error) {
 
 	switch chatId.(type) {
 	case int64, int, int32, int16, int8:
-		rawChat, err := ctx.app.GetInputPeer(parsedChatId)
+		rawChat, err := ctx.App.GetInputPeer(parsedChatId)
 		if err != nil {
 			return 0, fmt.Errorf("failed to resolve peer: %w", err)
 		}

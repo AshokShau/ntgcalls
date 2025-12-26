@@ -58,12 +58,12 @@ func (ctx *Context) connectCall(chatId int64, mediaDescription ntgcalls.MediaDes
 			LibraryVersions: protocolRaw.Versions,
 		}
 
-		userId, err := ctx.app.GetSendableUser(chatId)
+		userId, err := ctx.App.GetSendableUser(chatId)
 		if err != nil {
 			return err
 		}
 		if ctx.p2pConfigs[chatId].IsOutgoing {
-			_, err = ctx.app.PhoneRequestCall(
+			_, err = ctx.App.PhoneRequestCall(
 				&tg.PhoneRequestCallParams{
 					Protocol: protocol,
 					UserID:   userId,
@@ -76,7 +76,7 @@ func (ctx *Context) connectCall(chatId int64, mediaDescription ntgcalls.MediaDes
 				return err
 			}
 		} else {
-			_, err = ctx.app.PhoneAcceptCall(
+			_, err = ctx.App.PhoneAcceptCall(
 				ctx.inputCalls[chatId],
 				ctx.p2pConfigs[chatId].GAorB,
 				protocol,
@@ -103,7 +103,7 @@ func (ctx *Context) connectCall(chatId int64, mediaDescription ntgcalls.MediaDes
 		}
 
 		if ctx.p2pConfigs[chatId].IsOutgoing {
-			confirmRes, err := ctx.app.PhoneConfirmCall(
+			confirmRes, err := ctx.App.PhoneConfirmCall(
 				ctx.inputCalls[chatId],
 				res.GAOrB,
 				res.KeyFingerprint,
@@ -145,7 +145,7 @@ func (ctx *Context) connectCall(chatId int64, mediaDescription ntgcalls.MediaDes
 		}
 
 		resultParams := "{\"transport\": null}"
-		callResRaw, err := ctx.app.PhoneJoinGroupCall(
+		callResRaw, err := ctx.App.PhoneJoinGroupCall(
 			&tg.PhoneJoinGroupCallParams{
 				Muted:        false,
 				VideoStopped: mediaDescription.Camera == nil,
