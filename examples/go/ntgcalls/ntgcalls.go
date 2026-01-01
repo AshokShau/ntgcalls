@@ -15,13 +15,16 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
-
-	"github.com/Laky-64/gologging"
 )
 
 func init() {
 	C.ntg_register_logger((C.ntg_log_message_callback)(unsafe.Pointer(C.handleLogs)))
 }
+
+var (
+	loggerNTGCalls = NewLogger("ntgcalls", LevelInfo)
+	loggerWebRTC   = NewLogger("webrtc", LevelFatal)
+)
 
 func NTgCalls() *Client {
 	instance := &Client{
@@ -42,27 +45,28 @@ func NTgCalls() *Client {
 //export handleLogs
 func handleLogs(logMessage C.ntg_log_message_struct) {
 	message := fmt.Sprintf(
-		"(%s:%d) %s",
-		string(C.GoString(logMessage.file)),
+		"(%v:%v) %v",
+		C.GoString(logMessage.file),
 		uint32(logMessage.line),
-		string(C.GoString(logMessage.message)),
+		C.GoString(logMessage.message),
 	)
-	var loggerName string
+
+	var lg *Logger
 	if logMessage.source == C.NTG_LOG_WEBRTC {
-		loggerName = "webrtc"
+		lg = loggerWebRTC
 	} else {
-		loggerName = "ntgcalls"
+		lg = loggerNTGCalls
 	}
-	loggerInstance := gologging.GetLogger(loggerName)
+
 	switch logMessage.level {
 	case C.NTG_LOG_DEBUG:
-		loggerInstance.Debug(message)
+		lg.Debug(message)
 	case C.NTG_LOG_INFO:
-		loggerInstance.Info(message)
+		lg.Info(message)
 	case C.NTG_LOG_WARNING:
-		loggerInstance.Warn(message)
+		lg.Warn(message)
 	case C.NTG_LOG_ERROR:
-		loggerInstance.Error(message)
+		lg.Error(message)
 	}
 }
 
