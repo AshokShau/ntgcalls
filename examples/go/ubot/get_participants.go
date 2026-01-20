@@ -22,10 +22,11 @@ func (ctx *Context) GetParticipants(chatId int64) ([]*tg.GroupCallParticipant, e
 		if err != nil {
 			return nil, err
 		}
+
 		ctx.callParticipants[chatId].CallParticipants = make(map[int64]*tg.GroupCallParticipant)
 		var nextOffset string
 		for {
-			res, err := ctx.app.PhoneGetGroupParticipants(
+			res, err := ctx.App.PhoneGetGroupParticipants(
 				groupCall,
 				[]tg.InputPeer{},
 				[]int32{},
